@@ -1,0 +1,26 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+*.db
+
+# Uploads and temporary receipts
+uploads/
+scratch/
+
+# Environment variables
+.env
+*.json
+!requirements.json
+!manifest.json
+service_account.json
+token.json
+credentials.json
+gdrive_config.json

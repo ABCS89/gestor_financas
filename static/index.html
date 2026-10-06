@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gestor de Finanças Pessoais</title>
+  
+  <!-- Favicon & PWA Theme -->
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* Estilos para experiência mobile nativa */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input, textarea, select {
+      user-select: auto;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-200">
+
+  <!-- TOP HEADER -->
+  <header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 px-4 py-3 sm:px-6">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+          <i data-lucide="wallet" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight leading-tight">Finanças</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Controle Pessoal & Extratos</p>
+        </div>
+      </div>
+
+      <!-- Seletor de Mês/Ano & Dark Mode -->
+      <div class="flex items-center gap-2">
+        <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 text-xs sm:text-sm font-medium">
+          <button id="btnPrevMonth" class="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-md transition" title="Mês anterior">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+          </button>
+          <span id="currentMonthLabel" class="px-2 font-semibold min-w-[110px] text-center">Carregando...</span>
+          <button id="btnNextMonth" class="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-md transition" title="Próximo mês">
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <button id="btnToggleDark" class="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg bg-slate-100 dark:bg-slate-800 transition" title="Alternar tema">
+          <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+          <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 pb-24 sm:pb-8">
+    
+    <!-- TABS DE NAVEGAÇÃO DESKTOP -->
+    <div class="hidden sm:flex gap-2 mb-6 border-b border-slate-200 dark:border-slate-800 pb-2">
+      <button onclick="switchTab('dashboard')" class="tab-btn active px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-400" data-tab="dashboard">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Visão Geral
+      </button>
+      <button onclick="switchTab('transactions')" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" data-tab="transactions">
+        <i data-lucide="receipt-text" class="w-4 h-4"></i> Transações
+      </button>
+      <button onclick="switchTab('bank-import')" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" data-tab="bank-import">
+        <i data-lucide="building-2" class="w-4 h-4"></i> Importar Extrato
+      </button>
+      <button onclick="switchTab('receipts')" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" data-tab="receipts">
+        <i data-lucide="file-check" class="w-4 h-4"></i> Comprovantes
+      </button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 1: VISÃO GERAL (DASHBOARD) -->
+    <!-- ========================================== -->
+    <section id="tab-dashboard" class="tab-content space-y-6">
+      <!-- CARDS DE SALDO / ENTRADA / SAÍDA -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Saldo -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+            <span class="text-xs font-semibold uppercase tracking-wider">Saldo do Mês</span>
+            <div class="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-500">
+              <i data-lucide="scale" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="statBalance" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">R$ 0,00</div>
+          <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+            <i data-lucide="info" class="w-3 h-3"></i> Receitas menos Despesas
+          </p>
+        </div>
+
+        <!-- Receitas -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Receitas</span>
+            <div class="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-500">
+              <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="statIncome" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">R$ 0,00</div>
+          <p id="statIncomeCount" class="text-xs text-slate-400 mt-2">0 entradas registradas</p>
+        </div>
+
+        <!-- Despesas -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between text-rose-600 dark:text-rose-400 mb-1">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Despesas</span>
+            <div class="p-2 rounded-xl bg-rose-50 dark:bg-rose-950 text-rose-500">
+              <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="statExpense" class="text-2xl sm:text-3xl font-extrabold text-rose-600 dark:text-rose-400">R$ 0,00</div>
+          <p id="statExpenseCount" class="text-xs text-slate-400 mt-2">0 saídas registradas</p>
+        </div>
+      </div>
+
+      <!-- AÇÕES RÁPIDAS (BOTÕES) -->
+      <div class="flex flex-wrap gap-3">
+        <button onclick="openTransactionModal()" class="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-md shadow-brand-600/20 flex items-center justify-center gap-2 transition active:scale-95">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> Nova Transação
+        </button>
+        <button onclick="switchTab('bank-import')" class="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 font-semibold text-sm flex items-center justify-center gap-2 transition active:scale-95">
+          <i data-lucide="file-up" class="w-4 h-4 text-brand-600"></i> Importar Extrato (OFX/CSV)
+        </button>
+      </div>
+
+      <!-- GRÁFICO E CATEGORIAS -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Gráfico de Pizza / Doughnut -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+            <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-500"></i> Gastos por Categoria
+          </h3>
+          <div class="relative flex-1 min-h-[240px] flex items-center justify-center">
+            <canvas id="categoryChart"></canvas>
+            <div id="noChartData" class="hidden absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-sm">
+              <i data-lucide="inbox" class="w-8 h-8 mb-2 opacity-50"></i>
+              Nenhuma despesa neste mês
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de Despesas por Categoria com % -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300 mb-4 flex items-center justify-between">
+            <span class="flex items-center gap-2">
+              <i data-lucide="tags" class="w-4 h-4 text-indigo-500"></i> Detalhamento de Gastos
+            </span>
+            <span id="categoryCountBadge" class="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500">0 categorias</span>
+          </h3>
+          <div id="categoryBreakdownList" class="space-y-3 max-h-[270px] overflow-y-auto custom-scrollbar pr-1">
+            <!-- Inserido dinamicamente -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ÚLTIMAS TRANSAÇÕES DO MÊS -->
+      <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2">
+            <i data-lucide="clock" class="w-4 h-4 text-indigo-500"></i> Lançamentos Recentes
+          </h3>
+          <button onclick="switchTab('transactions')" class="text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400">Ver todas</button>
+        </div>
+        <div id="recentTransactionsList" class="divide-y divide-slate-100 dark:divide-slate-800">
+          <!-- Inserido via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: TRANSAÇÕES (LISTA COMPLETA & FILTROS) -->
+    <!-- ========================================== -->
+    <section id="tab-transactions" class="tab-content hidden space-y-4">
+      <!-- Barra de Ferramentas / Filtros -->
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <!-- Campo de Busca -->
+        <div class="relative flex-1">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+          <input type="text" id="txSearchInput" placeholder="Buscar por descrição..." class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Filtros Rápidos (Tipo) -->
+        <div class="flex items-center gap-2">
+          <select id="txTypeFilter" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-brand-500">
+            <option value="">Todos os tipos</option>
+            <option value="expense">Apenas Despesas</option>
+            <option value="income">Apenas Receitas</option>
+          </select>
+
+          <button onclick="openTransactionModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition whitespace-nowrap">
+            <i data-lucide="plus" class="w-4 h-4"></i> Nova
+          </button>
+        </div>
+      </div>
+
+      <!-- Lista de Transações -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div id="allTransactionsList" class="divide-y divide-slate-100 dark:divide-slate-800">
+          <!-- Renderizado via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: IMPORTAR EXTRATO BANCÁRIO (OFX / CSV) -->
+    <!-- ========================================== -->
+    <section id="tab-bank-import" class="tab-content hidden space-y-6">
+      <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div class="max-w-xl mx-auto text-center space-y-3">
+          <div class="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/80 text-brand-600 dark:text-brand-400 flex items-center justify-center mx-auto shadow-inner">
+            <i data-lucide="file-spreadsheet" class="w-7 h-7"></i>
+          </div>
+          <h2 class="text-xl font-bold">Importar Extrato do seu Banco</h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400">
+            Baixe o arquivo de extrato no formato <strong>.OFX</strong> ou <strong>.CSV</strong> do seu internet banking ou app (Nubank, Inter, Itaú, Bradesco, Santander, etc.) e solte abaixo.
+          </p>
+
+          <!-- Dropzone -->
+          <div id="bankDropzone" class="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-400 rounded-2xl p-8 cursor-pointer transition flex flex-col items-center justify-center gap-2 bg-slate-50/50 dark:bg-slate-800/20">
+            <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-400 group-hover:text-brand-500"></i>
+            <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Clique para selecionar ou arraste o arquivo aqui</span>
+            <span class="text-xs text-slate-400">Suporta arquivos .OFX e .CSV</span>
+            <input type="file" id="bankFileInput" accept=".ofx,.csv" class="hidden">
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview de Importação (Aparece após upload) -->
+      <div id="importPreviewContainer" class="hidden bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div>
+            <h3 class="font-bold text-lg flex items-center gap-2">
+              <i data-lucide="check-circle" class="w-5 h-5 text-emerald-500"></i> Pré-visualização do Extrato
+            </h3>
+            <p id="previewSubtitle" class="text-xs text-slate-500 mt-0.5">Arquivo processado com sucesso.</p>
+          </div>
+
+          <!-- Estatísticas do Extrato -->
+          <div class="flex items-center gap-3 text-xs font-medium">
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+              Entradas: <strong id="previewTotalIncome">R$ 0,00</strong>
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+              Saídas: <strong id="previewTotalExpense">R$ 0,00</strong>
+            </span>
+          </div>
+        </div>
+
+        <!-- Alerta de duplicadas se houver -->
+        <div id="duplicatesAlert" class="hidden p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-200 text-xs flex items-center gap-2">
+          <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 text-amber-500"></i>
+          <span id="duplicatesAlertText">Transações duplicadas detectadas.</span>
+        </div>
+
+        <!-- Tabela/Lista de transações do extrato -->
+        <div class="max-h-[350px] overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-800 rounded-xl">
+          <div id="previewTransactionsList" class="divide-y divide-slate-100 dark:divide-slate-800 text-xs sm:text-sm">
+            <!-- Itens de preview -->
+          </div>
+        </div>
+
+        <!-- Botão de Confirmação -->
+        <div class="flex justify-end gap-3 pt-2">
+          <button onclick="cancelBankImport()" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            Cancelar
+          </button>
+          <button id="btnConfirmImport" onclick="confirmBankImport()" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md shadow-emerald-600/20 flex items-center gap-2 transition">
+            <i data-lucide="check" class="w-4 h-4"></i> Confirmar e Salvar Transações
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 4: COMPROVANTES DE PAGAMENTO -->
+    <!-- ========================================== -->
+    <section id="tab-receipts" class="tab-content hidden space-y-6">
+      <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold flex items-center gap-2">
+            <i data-lucide="receipt" class="w-5 h-5 text-indigo-500"></i> Comprovantes Anexados
+          </h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Envie comprovantes de Pix, boletos pagos e faturas em PDF ou imagem.
+          </p>
+        </div>
+
+        <button onclick="openReceiptUploadModal()" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition">
+          <i data-lucide="upload" class="w-4 h-4"></i> Enviar Comprovante
+        </button>
+      </div>
+
+      <!-- CARD DE INTEGRAÇÃO COM GOOGLE DRIVE -->
+      <div class="bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <i data-lucide="hard-drive" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-sm flex items-center gap-2">
+                Sincronização com Google Drive
+                <span id="gdriveStatusBadge" class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-500">Verificando...</span>
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400" id="gdriveAccountInfo">
+                Conecte sua pasta do Drive para baixar comprovantes automaticamente.
+              </p>
+            </div>
+          </div>
+
+          <!-- Botões de Ação do Drive -->
+          <div class="flex items-center gap-2">
+            <button onclick="toggleGDriveHelp()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-xs font-semibold flex items-center gap-1" title="Como configurar o Drive">
+              <i data-lucide="help-circle" class="w-4 h-4"></i> Como Configurar
+            </button>
+            <button id="btnSyncGDrive" onclick="syncGDriveNow()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm shadow-blue-500/20 transition">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Sincronizar Agora
+            </button>
+          </div>
+        </div>
+
+        <!-- Campo de ID da Pasta -->
+        <div class="flex flex-col sm:flex-row gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+          <div class="relative flex-1">
+            <i data-lucide="folder" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+            <input type="text" id="gdriveFolderInput" placeholder="Cole aqui o link ou ID da pasta do Google Drive..." class="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <button onclick="saveGDriveFolder()" class="px-4 py-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold transition shrink-0">
+            Salvar Pasta
+          </button>
+        </div>
+
+        <!-- Instruções de Ajuda (Expansível) -->
+        <div id="gdriveHelpBox" class="hidden p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+          <p class="font-bold text-slate-800 dark:text-slate-100">📌 Como conectar sua pasta do Google Drive:</p>
+          <ol class="list-decimal list-inside space-y-1 pl-1">
+            <li>Abra o seu Google Drive no navegador e crie uma pasta (ex: <code>Comprovantes Financeiros</code>).</li>
+            <li>Abra a pasta e copie o link da barra de endereços (o código final da URL é o ID da pasta).</li>
+            <li>Cole o link no campo acima e clique em <strong>Salvar Pasta</strong>.</li>
+            <li>Compartilhe a pasta dando permissão de leitura para o e-mail do serviço: <code id="gdriveServiceEmailDisplay" class="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[11px] font-mono select-all">service_account.json</code></li>
+            <li>Pronto! Qualquer foto ou PDF que você salvar na pasta pelo celular será baixado automaticamente quando você clicar em <strong>Sincronizar Agora</strong>.</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Grid de Comprovantes -->
+      <div id="receiptsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <!-- Itens inseridos dinamicamente -->
+      </div>
+    </section>
+  </main>
+
+  <!-- ========================================== -->
+  <!-- BARRA DE NAVEGAÇÃO INFERIOR (MOBILE BOTTOM BAR) -->
+  <!-- ========================================== -->
+  <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around">
+    <button onclick="switchTab('dashboard')" class="mobile-tab-btn flex flex-col items-center gap-1 p-2 rounded-xl text-brand-600 dark:text-brand-400" data-tab="dashboard">
+      <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+      <span class="text-[10px] font-semibold">Início</span>
+    </button>
+    <button onclick="switchTab('transactions')" class="mobile-tab-btn flex flex-col items-center gap-1 p-2 rounded-xl text-slate-400" data-tab="transactions">
+      <i data-lucide="receipt-text" class="w-5 h-5"></i>
+      <span class="text-[10px] font-medium">Extrato</span>
+    </button>
+    <button onclick="openTransactionModal()" class="-mt-5 w-12 h-12 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-lg shadow-brand-500/30 active:scale-95 transition" title="Adicionar transação">
+      <i data-lucide="plus" class="w-6 h-6"></i>
+    </button>
+    <button onclick="switchTab('bank-import')" class="mobile-tab-btn flex flex-col items-center gap-1 p-2 rounded-xl text-slate-400" data-tab="bank-import">
+      <i data-lucide="building-2" class="w-5 h-5"></i>
+      <span class="text-[10px] font-medium">Importar</span>
+    </button>
+    <button onclick="switchTab('receipts')" class="mobile-tab-btn flex flex-col items-center gap-1 p-2 rounded-xl text-slate-400" data-tab="receipts">
+      <i data-lucide="file-check" class="w-5 h-5"></i>
+      <span class="text-[10px] font-medium">Recibos</span>
+    </button>
+  </nav>
+
+  <!-- ========================================== -->
+  <!-- MODAL: NOVA TRANSAÇÃO -->
+  <!-- ========================================== -->
+  <div id="txModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- Cabeçalho do Modal -->
+      <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-base sm:text-lg flex items-center gap-2">
+          <span id="txModalTitle">Nova Transação</span>
+        </h3>
+        <button onclick="closeTransactionModal()" class="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Formulário com scroll -->
+      <form id="txForm" onsubmit="handleSaveTransaction(event)" class="p-5 overflow-y-auto custom-scrollbar space-y-4">
+        <!-- Switch Despesa / Receita -->
+        <div class="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+          <button type="button" id="btnTypeExpense" onclick="setTxType('expense')" class="py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 bg-rose-600 text-white shadow-sm">
+            <i data-lucide="arrow-up-right" class="w-4 h-4"></i> Despesa
+          </button>
+          <button type="button" id="btnTypeIncome" onclick="setTxType('income')" class="py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900">
+            <i data-lucide="arrow-down-left" class="w-4 h-4"></i> Receita
+          </button>
+        </div>
+        <input type="hidden" id="txTypeInput" value="expense">
+
+        <!-- Valor -->
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Valor (R$)</label>
+          <div class="relative">
+            <span class="absolute left-4 top-3 text-slate-400 font-bold">R$</span>
+            <input type="number" step="0.01" min="0.01" id="txAmountInput" required placeholder="0,00" class="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xl font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+
+        <!-- Descrição -->
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Descrição</label>
+          <input type="text" id="txDescInput" required placeholder="Ex: Supermercado, Aluguel, Salário..." class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <!-- Data & Categoria -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Data</label>
+            <input type="date" id="txDateInput" required class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Categoria</label>
+            <select id="txCategorySelect" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Selecione uma categoria</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Anexo de Comprovante -->
+        <div class="border border-slate-200 dark:border-slate-700/80 rounded-2xl p-3 bg-slate-50/50 dark:bg-slate-800/40">
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+            <i data-lucide="paperclip" class="w-4 h-4 text-indigo-500"></i> Anexar Comprovante (Opcional)
+          </label>
+          <p class="text-[11px] text-slate-400 mb-2">Foto de comprovante Pix, boleto ou recibo em PDF/imagem.</p>
+          <input type="file" id="txReceiptFileInput" accept="image/*,.pdf" class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-slate-700 dark:file:text-slate-200 cursor-pointer">
+        </div>
+
+        <!-- Observações -->
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Observações (Opcional)</label>
+          <textarea id="txNotesInput" rows="2" placeholder="Detalhes adicionais..." class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+
+        <!-- Ações do Modal -->
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" onclick="closeTransactionModal()" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            Cancelar
+          </button>
+          <button type="submit" id="btnSubmitTx" class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-md shadow-brand-500/20 transition flex items-center gap-2">
+            <i data-lucide="check" class="w-4 h-4"></i> Salvar Lançamento
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: VISUALIZADOR DE COMPROVANTE -->
+  <!-- ========================================== -->
+  <div id="receiptViewerModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <h4 id="receiptViewerTitle" class="font-bold text-sm truncate max-w-[80%]">Visualizar Comprovante</h4>
+        <div class="flex items-center gap-2">
+          <a id="receiptDownloadLink" href="#" target="_blank" download class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-500 transition" title="Abrir em tela cheia">
+            <i data-lucide="external-link" class="w-4 h-4"></i>
+          </a>
+          <button onclick="closeReceiptViewer()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-500 transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+      <div id="receiptViewerContent" class="flex-1 p-4 flex items-center justify-center overflow-auto bg-slate-950/20 min-h-[300px]">
+        <!-- Imagem ou iframe de PDF -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- JAVASCRIPT PRINCIPAL DA APLICAÇÃO -->
+  <!-- ========================================== -->
+  <script>
+    // Estado da Aplicação
+    const state = {
+      currentMonth: new Date().getMonth() + 1,
+      currentYear: new Date().getFullYear(),
+      categories: [],
+      chartInstance: null,
+      previewImportData: null
+    };
+
+    const MONTH_NAMES = [
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+
+    // Inicialização
+    document.addEventListener("DOMContentLoaded", async () => {
+      initTheme();
+      initDatePickers();
+      initDropzone();
+      await loadCategories();
+      updateMonthLabel();
+      await loadDashboardData();
+      await loadTransactionsList();
+      lucide.createIcons();
+    });
+
+    // Dark Mode
+    function initTheme() {
+      const isDark = localStorage.getItem("theme") === "dark" || 
+        (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      if (isDark) document.documentElement.classList.add("dark");
+      
+      document.getElementById("btnToggleDark").addEventListener("click", () => {
+        document.documentElement.classList.toggle("dark");
+        const darkActive = document.documentElement.classList.contains("dark");
+        localStorage.setItem("theme", darkActive ? "dark" : "light");
+      });
+    }
+
+    // Navegação por abas
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
+      const target = document.getElementById(`tab-${tabId}`);
+      if (target) target.classList.remove("hidden");
+
+      // Atualiza botões Desktop
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        if (btn.getAttribute("data-tab") === tabId) {
+          btn.className = "tab-btn active px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-400";
+        } else {
+          btn.className = "tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800";
+        }
+      });
+
+      // Atualiza botões Mobile
+      document.querySelectorAll(".mobile-tab-btn").forEach(btn => {
+        if (btn.getAttribute("data-tab") === tabId) {
+          btn.className = "mobile-tab-btn flex flex-col items-center gap-1 p-2 rounded-xl text-brand-600 dark:text-brand-400";
+        } else {
+          btn.className = "mobile-tab-btn flex flex-col items-center gap-1 p-2 rounded-xl text-slate-400";
+        }
+      });
+
+      if (tabId === "receipts") {
+        loadReceiptsList();
+        loadGDriveStatus();
+      } else if (tabId === "transactions") {
+        loadTransactionsList();
+      } else if (tabId === "dashboard") {
+        loadDashboardData();
+      }
+
+      lucide.createIcons();
+    }
+
+    // Seletor de Mês/Ano
+    function initDatePickers() {
+      document.getElementById("btnPrevMonth").addEventListener("click", () => {
+        if (state.currentMonth === 1) {
+          state.currentMonth = 12;
+          state.currentYear--;
+        } else {
+          state.currentMonth--;
+        }
+        onMonthChanged();
+      });
+
+      document.getElementById("btnNextMonth").addEventListener("click", () => {
+        if (state.currentMonth === 12) {
+          state.currentMonth = 1;
+          state.currentYear++;
+        } else {
+          state.currentMonth++;
+        }
+        onMonthChanged();
+      });
+
+      // Data padrão no formulário = hoje
+      document.getElementById("txDateInput").value = new Date().toISOString().split("T")[0];
+
+      // Filtros de busca de transação
+      document.getElementById("txSearchInput").addEventListener("input", debounce(loadTransactionsList, 300));
+      document.getElementById("txTypeFilter").addEventListener("change", loadTransactionsList);
+    }
+
+    function updateMonthLabel() {
+      const label = `${MONTH_NAMES[state.currentMonth - 1]} ${state.currentYear}`;
+      document.getElementById("currentMonthLabel").textContent = label;
+    }
+
+    function onMonthChanged() {
+      updateMonthLabel();
+      loadDashboardData();
+      loadTransactionsList();
+    }
+
+    // Formatar moeda brasileira R$
+    function formatMoney(amount) {
+      return (amount || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    // Formatar data brasileira DD/MM/AAAA
+    function formatDate(dateStr) {
+      if (!dateStr) return "";
+      const parts = dateStr.split("-");
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      return dateStr;
+    }
+
+    // Carregar Categorias
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/categories");
+        state.categories = await res.json();
+        populateCategorySelect();
+      } catch (err) {
+        console.error("Erro ao carregar categorias:", err);
+      }
+    }
+
+    function populateCategorySelect() {
+      const select = document.getElementById("txCategorySelect");
+      const currentType = document.getElementById("txTypeInput").value;
+      select.innerHTML = '<option value="">Selecione uma categoria</option>';
+
+      const filtered = state.categories.filter(c => c.type === currentType);
+      filtered.forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat.id;
+        opt.textContent = cat.name;
+        select.appendChild(opt);
+      });
+    }
+
+    // Carregar Dados do Dashboard
+    async function loadDashboardData() {
+      try {
+        const res = await fetch(`/api/analytics/summary?month=${state.currentMonth}&year=${state.currentYear}`);
+        const data = await res.json();
+
+        // Cards principais
+        const elBalance = document.getElementById("statBalance");
+        elBalance.textContent = formatMoney(data.balance);
+        if (data.balance >= 0) {
+          elBalance.className = "text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white";
+        } else {
+          elBalance.className = "text-2xl sm:text-3xl font-extrabold text-rose-600 dark:text-rose-400";
+        }
+
+        document.getElementById("statIncome").textContent = formatMoney(data.total_income);
+        document.getElementById("statExpense").textContent = formatMoney(data.total_expense);
+
+        // Renderizar gráfico de pizza
+        renderCategoryChart(data.category_breakdown);
+
+        // Renderizar lista de detalhamento de categorias
+        renderCategoryBreakdown(data.category_breakdown, data.total_expense);
+
+        // Carregar últimas 5 transações no dashboard
+        loadRecentTransactions();
+      } catch (err) {
+        console.error("Erro ao carregar dashboard:", err);
+      }
+    }
+
+    function renderCategoryChart(breakdown) {
+      const ctx = document.getElementById("categoryChart").getContext("2d");
+      const noDataEl = document.getElementById("noChartData");
+
+      if (!breakdown || breakdown.length === 0) {
+        if (state.chartInstance) state.chartInstance.destroy();
+        noDataEl.classList.remove("hidden");
+        return;
+      }
+      noDataEl.classList.add("hidden");
+
+      if (state.chartInstance) {
+        state.chartInstance.destroy();
+      }
+
+      state.chartInstance = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: breakdown.map(b => b.name),
+          datasets: [{
+            data: breakdown.map(b => b.total),
+            backgroundColor: breakdown.map(b => b.color || "#6366f1"),
+            borderWidth: 2,
+            borderColor: document.documentElement.classList.contains("dark") ? "#0f172a" : "#ffffff"
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.label}: ${formatMoney(ctx.parsed)}`
+              }
+            }
+          },
+          cutout: "70%"
+        }
+      });
+    }
+
+    function renderCategoryBreakdown(breakdown, totalExpense) {
+      const container = document.getElementById("categoryBreakdownList");
+      const badge = document.getElementById("categoryCountBadge");
+      badge.textContent = `${breakdown.length} categorias`;
+
+      if (!breakdown || breakdown.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-400 py-4 text-center">Nenhum gasto registrado neste mês.</div>';
+        return;
+      }
+
+      container.innerHTML = breakdown.map(cat => `
+        <div class="space-y-1">
+          <div class="flex items-center justify-between text-xs font-semibold">
+            <span class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color}"></span>
+              ${cat.name}
+            </span>
+            <span>${formatMoney(cat.total)} <span class="text-slate-400 font-normal">(${cat.percentage}%)</span></span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full rounded-full" style="width: ${cat.percentage}%; background-color: ${cat.color}"></div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    // Carregar Últimas Transações para o Dashboard
+    async function loadRecentTransactions() {
+      try {
+        const res = await fetch(`/api/transactions?month=${state.currentMonth}&year=${state.currentYear}&limit=5`);
+        const txs = await res.json();
+        const container = document.getElementById("recentTransactionsList");
+
+        if (!txs || txs.length === 0) {
+          container.innerHTML = '<div class="text-xs text-slate-400 py-6 text-center">Nenhum lançamento neste mês ainda. Comece adicionando um novo!</div>';
+          return;
+        }
+
+        container.innerHTML = txs.map(tx => renderTransactionRow(tx)).join("");
+        lucide.createIcons();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Carregar Lista Completa de Transações (Aba 2)
+    async function loadTransactionsList() {
+      try {
+        const search = document.getElementById("txSearchInput").value;
+        const type = document.getElementById("txTypeFilter").value;
+        let url = `/api/transactions?month=${state.currentMonth}&year=${state.currentYear}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (type) url += `&type=${type}`;
+
+        const res = await fetch(url);
+        const txs = await res.json();
+        const container = document.getElementById("allTransactionsList");
+
+        if (!txs || txs.length === 0) {
+          container.innerHTML = '<div class="text-sm text-slate-400 py-12 text-center">Nenhuma transação encontrada com os filtros atuais.</div>';
+          return;
+        }
+
+        container.innerHTML = txs.map(tx => renderTransactionRow(tx, true)).join("");
+        lucide.createIcons();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // HTML de uma linha de transação
+    function renderTransactionRow(tx, showDelete = false) {
+      const isExpense = tx.type === "expense";
+      const amountPrefix = isExpense ? "- " : "+ ";
+      const amountClass = isExpense ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400";
+      const icon = isExpense ? "arrow-up-right" : "arrow-down-left";
+      const catColor = tx.category ? tx.category.color : "#94a3b8";
+      const catName = tx.category ? tx.category.name : "Sem categoria";
+
+      let receiptBadge = "";
+      if (tx.receipt) {
+        receiptBadge = `
+          <button onclick="viewReceipt('${tx.receipt.filename}', '${tx.description}')" class="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 text-[11px] font-semibold flex items-center gap-1 hover:bg-indigo-100 transition" title="Ver comprovante anexado">
+            <i data-lucide="paperclip" class="w-3 h-3"></i> Comprovante
+          </button>
+        `;
+      }
+
+      let deleteBtn = "";
+      if (showDelete) {
+        deleteBtn = `
+          <button onclick="deleteTransaction(${tx.id})" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition" title="Excluir transação">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        `;
+      }
+
+      return `
+        <div class="py-3 px-3 sm:px-4 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style="background-color: ${catColor}15; color: ${catColor}">
+              <i data-lucide="${icon}" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="font-semibold text-xs sm:text-sm truncate text-slate-800 dark:text-slate-100">${escapeHtml(tx.description)}</div>
+              <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5 flex-wrap">
+                <span>${formatDate(tx.date)}</span>
+                <span>•</span>
+                <span class="inline-flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full" style="background-color: ${catColor}"></span>
+                  ${catName}
+                </span>
+                ${receiptBadge}
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <span class="font-bold text-xs sm:text-sm ${amountClass} whitespace-nowrap">
+              ${amountPrefix}${formatMoney(tx.amount)}
+            </span>
+            ${deleteBtn}
+          </div>
+        </div>
+      `;
+    }
+
+    // Modal de Transação
+    function openTransactionModal() {
+      document.getElementById("txModal").classList.remove("hidden");
+      document.getElementById("txForm").reset();
+      document.getElementById("txDateInput").value = new Date().toISOString().split("T")[0];
+      setTxType("expense");
+      populateCategorySelect();
+    }
+
+    function closeTransactionModal() {
+      document.getElementById("txModal").classList.add("hidden");
+    }
+
+    function setTxType(type) {
+      document.getElementById("txTypeInput").value = type;
+      const btnExp = document.getElementById("btnTypeExpense");
+      const btnInc = document.getElementById("btnTypeIncome");
+
+      if (type === "expense") {
+        btnExp.className = "py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 bg-rose-600 text-white shadow-sm";
+        btnInc.className = "py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900";
+      } else {
+        btnInc.className = "py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm";
+        btnExp.className = "py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900";
+      }
+      populateCategorySelect();
+    }
+
+    async function handleSaveTransaction(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btnSubmitTx");
+      btn.disabled = true;
+      btn.innerHTML = 'Salvando...';
+
+      try {
+        const formData = new FormData();
+        formData.append("description", document.getElementById("txDescInput").value);
+        formData.append("amount", document.getElementById("txAmountInput").value);
+        formData.append("type", document.getElementById("txTypeInput").value);
+        formData.append("date", document.getElementById("txDateInput").value);
+        
+        const catId = document.getElementById("txCategorySelect").value;
+        if (catId) formData.append("category_id", catId);
+
+        const notes = document.getElementById("txNotesInput").value;
+        if (notes) formData.append("notes", notes);
+
+        const fileInput = document.getElementById("txReceiptFileInput");
+        if (fileInput.files.length > 0) {
+          formData.append("receipt_file", fileInput.files[0]);
+        }
+
+        const res = await fetch("/api/transactions/with-receipt", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Erro ao salvar: " + (err.detail || "Erro inesperado"));
+          return;
+        }
+
+        closeTransactionModal();
+        await loadDashboardData();
+        await loadTransactionsList();
+      } catch (err) {
+        alert("Erro na requisição: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Salvar Lançamento';
+        lucide.createIcons();
+      }
+    }
+
+    async function deleteTransaction(id) {
+      if (!confirm("Tem certeza que deseja excluir este lançamento?")) return;
+      try {
+        await fetch(`/api/transactions/${id}`, { method: "DELETE" });
+        await loadDashboardData();
+        await loadTransactionsList();
+      } catch (err) {
+        alert("Erro ao excluir: " + err.message);
+      }
+    }
+
+    // ==========================================
+    // IMPORTAÇÃO DE EXTRATOS (OFX / CSV)
+    // ==========================================
+    function initDropzone() {
+      const dropzone = document.getElementById("bankDropzone");
+      const fileInput = document.getElementById("bankFileInput");
+
+      dropzone.addEventListener("click", () => fileInput.click());
+
+      dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("border-brand-500", "bg-brand-50/20");
+      });
+
+      dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("border-brand-500", "bg-brand-50/20");
+      });
+
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("border-brand-500", "bg-brand-50/20");
+        if (e.dataTransfer.files.length > 0) {
+          handleBankFileUpload(e.dataTransfer.files[0]);
+        }
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        if (e.target.files.length > 0) {
+          handleBankFileUpload(e.target.files[0]);
+        }
+      });
+    }
+
+    async function handleBankFileUpload(file) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await fetch("/api/bank/preview", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Erro no arquivo: " + (err.detail || "Não foi possível ler o extrato"));
+          return;
+        }
+
+        const data = await res.json();
+        state.previewImportData = data;
+        renderImportPreview(data);
+      } catch (err) {
+        alert("Erro ao enviar arquivo: " + err.message);
+      }
+    }
+
+    function renderImportPreview(data) {
+      const container = document.getElementById("importPreviewContainer");
+      container.classList.remove("hidden");
+
+      document.getElementById("previewSubtitle").textContent = 
+        `Extrato: ${data.bank_name || data.filename} • ${data.total_count} transações detectadas`;
+
+      document.getElementById("previewTotalIncome").textContent = formatMoney(data.total_income);
+      document.getElementById("previewTotalExpense").textContent = formatMoney(data.total_expense);
+
+      const dupAlert = document.getElementById("duplicatesAlert");
+      if (data.duplicates_count > 0) {
+        dupAlert.classList.remove("hidden");
+        document.getElementById("duplicatesAlertText").textContent = 
+          `${data.duplicates_count} transação(ões) já constam no seu aplicativo e serão ignoradas automaticamente para evitar lançamentos repetidos.`;
+      } else {
+        dupAlert.classList.add("hidden");
+      }
+
+      const listEl = document.getElementById("previewTransactionsList");
+      listEl.innerHTML = data.transactions.map((tx, idx) => {
+        const isExp = tx.type === "expense";
+        const sign = isExp ? "-" : "+";
+        const color = isExp ? "text-rose-600" : "text-emerald-600";
+        const dupBadge = tx.is_duplicate 
+          ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">Já Importada</span>` 
+          : `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">Nova</span>`;
+
+        return `
+          <div class="py-2.5 px-3 flex items-center justify-between gap-3 ${tx.is_duplicate ? 'opacity-50 bg-slate-50/50 dark:bg-slate-800/30' : ''}">
+            <div class="min-w-0">
+              <div class="font-semibold truncate text-slate-800 dark:text-slate-100">${escapeHtml(tx.description)}</div>
+              <div class="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                <span>${formatDate(tx.date)}</span>
+                <span>• Sugestão: <strong>${tx.suggested_category_name}</strong></span>
+                ${dupBadge}
+              </div>
+            </div>
+            <div class="font-bold text-sm ${color} whitespace-nowrap">
+              ${sign} ${formatMoney(tx.amount)}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      container.scrollIntoView({ behavior: "smooth" });
+      lucide.createIcons();
+    }
+
+    function cancelBankImport() {
+      document.getElementById("importPreviewContainer").classList.add("hidden");
+      document.getElementById("bankFileInput").value = "";
+      state.previewImportData = null;
+    }
+
+    async function confirmBankImport() {
+      if (!state.previewImportData) return;
+      const btn = document.getElementById("btnConfirmImport");
+      btn.disabled = true;
+      btn.innerHTML = "Importando...";
+
+      try {
+        const res = await fetch("/api/bank/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transactions: state.previewImportData.transactions })
+        });
+
+        const resData = await res.json();
+        alert(resData.message);
+
+        cancelBankImport();
+        await loadDashboardData();
+        await loadTransactionsList();
+        switchTab("transactions");
+      } catch (err) {
+        alert("Erro ao confirmar importação: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Confirmar e Salvar Transações';
+        lucide.createIcons();
+      }
+    }
+
+    // ==========================================
+    // COMPROVANTES
+    // ==========================================
+    async function loadReceiptsList() {
+      try {
+        const res = await fetch("/api/receipts");
+        const receipts = await res.json();
+        const grid = document.getElementById("receiptsGrid");
+
+        if (!receipts || receipts.length === 0) {
+          grid.innerHTML = '<div class="col-span-full text-center py-12 text-sm text-slate-400">Nenhum comprovante enviado ainda.</div>';
+          return;
+        }
+
+        grid.innerHTML = receipts.map(r => {
+          const isPdf = r.content_type.includes("pdf");
+          const previewHtml = isPdf 
+            ? `<div class="w-full h-36 bg-rose-50 dark:bg-rose-950/30 flex flex-col items-center justify-center text-rose-500"><i data-lucide="file-text" class="w-10 h-10 mb-1"></i><span class="text-xs font-semibold">Documento PDF</span></div>`
+            : `<img src="${r.url}" alt="${escapeHtml(r.original_filename)}" class="w-full h-36 object-cover bg-slate-100 dark:bg-slate-800">`;
+
+          let linkedTx = '<span class="text-[11px] text-amber-500">Sem transação vinculada</span>';
+          if (r.transaction) {
+            linkedTx = `<span class="text-[11px] text-emerald-600 font-semibold truncate block">Vinculado: ${escapeHtml(r.transaction.description)} (${formatMoney(r.transaction.amount)})</span>`;
+          }
+
+          let driveBadge = "";
+          if (r.drive_web_url) {
+            driveBadge = `
+              <a href="${r.drive_web_url}" target="_blank" class="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full font-semibold hover:underline" title="Abrir no Google Drive">
+                <i data-lucide="external-link" class="w-3 h-3"></i> Google Drive
+              </a>
+            `;
+          }
+
+          return `
+            <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+              <div class="cursor-pointer" onclick="viewReceipt('${r.filename}', '${escapeHtml(r.original_filename)}')">
+                ${previewHtml}
+              </div>
+              <div class="p-3 flex-1 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-semibold text-xs truncate text-slate-800 dark:text-slate-100" title="${r.original_filename}">
+                      ${escapeHtml(r.original_filename)}
+                    </span>
+                    ${driveBadge}
+                  </div>
+                  <div class="mt-1">${linkedTx}</div>
+                </div>
+                <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span class="text-[10px] text-slate-400">${(r.file_size / 1024).toFixed(0)} KB</span>
+                  <div class="flex items-center gap-1">
+                    <button onclick="viewReceipt('${r.filename}', '${escapeHtml(r.original_filename)}')" class="p-1 rounded-lg text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-xs font-semibold flex items-center gap-1">
+                      <i data-lucide="eye" class="w-3.5 h-3.5"></i> Ver
+                    </button>
+                    <button onclick="deleteReceipt(${r.id})" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 transition" title="Excluir comprovante">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // ==========================================
+    // FUNÇÕES DO GOOGLE DRIVE
+    // ==========================================
+    async function loadGDriveStatus() {
+      try {
+        const res = await fetch("/api/gdrive/status");
+        const data = await res.json();
+
+        const badge = document.getElementById("gdriveStatusBadge");
+        const accountInfo = document.getElementById("gdriveAccountInfo");
+        const emailDisplay = document.getElementById("gdriveServiceEmailDisplay");
+        const folderInput = document.getElementById("gdriveFolderInput");
+
+        if (data.folder_id) {
+          folderInput.value = data.folder_id;
+        }
+
+        if (data.connected) {
+          badge.className = "text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300";
+          badge.textContent = "Conectado";
+          accountInfo.textContent = `Autenticado como: ${data.user_email || 'Conta Google'}`;
+          if (emailDisplay) emailDisplay.textContent = data.user_email;
+        } else {
+          badge.className = "text-[10px] px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300";
+          badge.textContent = "Aguardando Credenciais";
+          accountInfo.textContent = data.message || "Configure o arquivo service_account.json ou GDRIVE_SERVICE_ACCOUNT_JSON";
+        }
+      } catch (err) {
+        console.error("Erro ao verificar status do Google Drive:", err);
+      }
+    }
+
+    function toggleGDriveHelp() {
+      const box = document.getElementById("gdriveHelpBox");
+      box.classList.toggle("hidden");
+      lucide.createIcons();
+    }
+
+    async function saveGDriveFolder() {
+      const folderId = document.getElementById("gdriveFolderInput").value.trim();
+      if (!folderId) {
+        alert("Por favor, cole o link ou ID da pasta do Google Drive.");
+        return;
+      }
+      try {
+        const res = await fetch("/api/gdrive/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folder_id: folderId })
+        });
+        const data = await res.json();
+        alert(data.message || "Pasta salva!");
+        document.getElementById("gdriveFolderInput").value = data.folder_id;
+      } catch (err) {
+        alert("Erro ao salvar pasta: " + err.message);
+      }
+    }
+
+    async function syncGDriveNow() {
+      const btn = document.getElementById("btnSyncGDrive");
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Sincronizando...`;
+      lucide.createIcons();
+
+      try {
+        const res = await fetch("/api/gdrive/sync", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) {
+          alert("Aviso: " + (data.detail || "Erro ao sincronizar. Verifique se as credenciais e o ID da pasta estão corretos."));
+          return;
+        }
+        alert(data.message);
+        await loadReceiptsList();
+      } catch (err) {
+        alert("Erro na conexão com Google Drive: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="refresh-cw" class="w-4 h-4"></i> Sincronizar Agora`;
+        lucide.createIcons();
+      }
+    }
+
+    function viewReceipt(filename, title) {
+      const modal = document.getElementById("receiptViewerModal");
+      const titleEl = document.getElementById("receiptViewerTitle");
+      const contentEl = document.getElementById("receiptViewerContent");
+      const downloadLink = document.getElementById("receiptDownloadLink");
+
+      const fileUrl = `/api/receipts/view/${filename}`;
+      titleEl.textContent = title || "Comprovante";
+      downloadLink.href = fileUrl;
+
+      if (filename.toLowerCase().endsWith(".pdf")) {
+        contentEl.innerHTML = `<iframe src="${fileUrl}" class="w-full h-[500px] rounded-xl border border-slate-700"></iframe>`;
+      } else {
+        contentEl.innerHTML = `<img src="${fileUrl}" class="max-h-[500px] max-w-full object-contain rounded-xl shadow-lg">`;
+      }
+
+      modal.classList.remove("hidden");
+      lucide.createIcons();
+    }
+
+    function closeReceiptViewer() {
+      document.getElementById("receiptViewerModal").classList.add("hidden");
+    }
+
+    async function deleteReceipt(id) {
+      if (!confirm("Deseja realmente excluir este comprovante?")) return;
+      try {
+        await fetch(`/api/receipts/${id}`, { method: "DELETE" });
+        loadReceiptsList();
+      } catch (err) {
+        alert("Erro ao excluir: " + err.message);
+      }
+    }
+
+    function openReceiptUploadModal() {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*,.pdf";
+      input.onchange = async (e) => {
+        if (e.target.files.length > 0) {
+          const file = e.target.files[0];
+          const formData = new FormData();
+          formData.append("file", file);
+          try {
+            const res = await fetch("/api/receipts/upload", { method: "POST", body: formData });
+            if (res.ok) {
+              loadReceiptsList();
+            } else {
+              const err = await res.json();
+              alert(err.detail || "Erro no upload");
+            }
+          } catch (err) {
+            alert(err.message);
+          }
+        }
+      };
+      input.click();
+    }
+
+    // Utilidades
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
+  </script>
+</body>
+</html>

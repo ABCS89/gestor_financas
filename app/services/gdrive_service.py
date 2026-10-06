@@ -1,0 +1,175 @@
+import os
+import io
+import json
+import uuid
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from sqlalchemy.orm import Session
+from app.models import Receipt
+from app.services.receipt_service import UPLOAD_DIR
+
+GDRIVE_SETTINGS_FILE = Path("gdrive_config.json")
+SERVICE_ACCOUNT_FILE = Path("service_account.json")
+TOKEN_FILE = Path("token.json")
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+
+
+def get_stored_config() -> Dict[str, Any]:
+    if GDRIVE_SETTINGS_FILE.exists():
+        try:
+            with open(GDRIVE_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"folder_id": os.getenv("GDRIVE_FOLDER_ID", "")}
+
+
+def save_stored_config(config: Dict[str, Any]):
+    with open(GDRIVE_SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+
+
+def get_drive_credentials():
+    # 1. Variável de ambiente com JSON do Service Account (para Render / Produção)
+    env_json = os.getenv("GDRIVE_SERVICE_ACCOUNT_JSON")
+    if env_json:
+        try:
+            info = json.loads(env_json)
+            return service_account.Credentials.from_service_account_info(info, scopes=SCOPES)
+        except Exception as e:
+            print(f"Erro ao carregar GDRIVE_SERVICE_ACCOUNT_JSON: {e}")
+
+    # 2. Arquivo service_account.json local
+    if SERVICE_ACCOUNT_FILE.exists():
+        try:
+            return service_account.Credentials.from_service_account_file(
+                str(SERVICE_ACCOUNT_FILE), scopes=SCOPES
+            )
+        except Exception as e:
+            print(f"Erro ao carregar service_account.json: {e}")
+
+    # 3. Arquivo token.json (se OAuth2 foi usado)
+    if TOKEN_FILE.exists():
+        try:
+            creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), scopes=SCOPES)
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            return creds
+        except Exception as e:
+            print(f"Erro ao carregar token.json: {e}")
+
+    return None
+
+
+def get_drive_service():
+    creds = get_drive_credentials()
+    if not creds:
+        return None
+    return build("drive", "v3", credentials=creds)
+
+
+def test_drive_connection() -> Dict[str, Any]:
+    creds = get_drive_credentials()
+    if not creds:
+        return {
+            "connected": False,
+            "message": "Nenhuma credencial do Google Drive configurada. Adicione o arquivo service_account.json ou a variável GDRIVE_SERVICE_ACCOUNT_JSON."
+        }
+    try:
+        service = build("drive", "v3", credentials=creds)
+        about = service.about().get(fields="user, storageQuota").execute()
+        user_info = about.get("user", {})
+        return {
+            "connected": True,
+            "user_email": getattr(creds, "service_account_email", None) or user_info.get("emailAddress", "Conectado"),
+            "display_name": user_info.get("displayName", "Conta Google"),
+            "is_service_account": hasattr(creds, "service_account_email")
+        }
+    except Exception as e:
+        return {
+            "connected": False,
+            "message": f"Falha ao autenticar no Google Drive: {str(e)}"
+        }
+
+
+def list_files_in_folder(service, folder_id: str) -> List[Dict[str, Any]]:
+    # Buscar arquivos de imagens e PDFs na pasta
+    query = (
+        f"'{folder_id}' in parents and trashed = false and "
+        "(mimeType contains 'image/' or mimeType = 'application/pdf')"
+    )
+    results = service.files().list(
+        q=query,
+        pageSize=100,
+        fields="files(id, name, mimeType, size, webViewLink, createdTime)"
+    ).execute()
+    return results.get("files", [])
+
+
+def sync_drive_receipts(folder_id: str, db: Session) -> Dict[str, Any]:
+    service = get_drive_service()
+    if not service:
+        raise ValueError("Google Drive não está autenticado. Configure as credenciais primeiro.")
+
+    if not folder_id:
+        raise ValueError("ID da pasta do Google Drive não informado.")
+
+    files = list_files_in_folder(service, folder_id)
+    imported_count = 0
+    already_imported_count = 0
+
+    for f in files:
+        file_id = f["id"]
+        file_name = f["name"]
+        mime_type = f.get("mimeType", "application/octet-stream")
+        web_link = f.get("webViewLink", "")
+
+        # Verifica se já foi importado
+        existing = db.query(Receipt).filter(Receipt.drive_file_id == file_id).first()
+        if existing:
+            already_imported_count += 1
+            continue
+
+        # Baixar conteúdo do arquivo
+        ext = Path(file_name).suffix.lower()
+        if not ext:
+            ext = ".pdf" if "pdf" in mime_type else ".jpg"
+
+        unique_filename = f"drive_{uuid.uuid4().hex[:12]}_{file_id[:8]}{ext}"
+        destination = UPLOAD_DIR / unique_filename
+
+        request = service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        file_bytes = fh.getvalue()
+        with open(destination, "wb") as out_f:
+            out_f.write(file_bytes)
+
+        receipt = Receipt(
+            filename=unique_filename,
+            original_filename=file_name,
+            content_type=mime_type,
+            file_size=len(file_bytes),
+            notes=f"Sincronizado automaticamente do Google Drive",
+            drive_file_id=file_id,
+            drive_web_url=web_link
+        )
+        db.add(receipt)
+        imported_count += 1
+
+    db.commit()
+
+    return {
+        "total_in_drive": len(files),
+        "imported": imported_count,
+        "already_synced": already_imported_count
+    }
