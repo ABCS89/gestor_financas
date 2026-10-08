@@ -32,13 +32,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluir rotas da API
-app.include_router(categories.router)
-app.include_router(receipts.router)
-app.include_router(transactions.router)
-app.include_router(bank_import.router)
-app.include_router(analytics.router)
-app.include_router(gdrive.router)
+from app.auth import router as auth_router, require_auth
+
+# Incluir rotas de autenticação (públicas)
+app.include_router(auth_router)
+
+# Incluir rotas protegidas da API
+app.include_router(categories.router, dependencies=[Depends(require_auth)])
+app.include_router(receipts.router, dependencies=[Depends(require_auth)])
+app.include_router(transactions.router, dependencies=[Depends(require_auth)])
+app.include_router(bank_import.router, dependencies=[Depends(require_auth)])
+app.include_router(analytics.router, dependencies=[Depends(require_auth)])
+app.include_router(gdrive.router, dependencies=[Depends(require_auth)])
 
 
 # Inicialização: alimentar categorias padrão

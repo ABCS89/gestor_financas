@@ -60,6 +60,40 @@
 </head>
 <body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-200">
 
+  <!-- TELA DE LOGIN / BLOQUEIO -->
+  <div id="loginScreen" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-5">
+      <div class="text-center space-y-2">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/30 mx-auto">
+          <i data-lucide="lock" class="w-7 h-7"></i>
+        </div>
+        <h2 class="text-xl font-bold tracking-tight">Finanças Pessoais</h2>
+        <p class="text-xs text-slate-400">Digite seu usuário e senha para acessar</p>
+      </div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+        <div id="loginErrorMsg" class="hidden p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-2">
+          <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+          <span id="loginErrorText">Usuário ou senha incorretos.</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Usuário</label>
+          <input type="text" id="loginUsername" required autocomplete="username" placeholder="admin" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Senha</label>
+          <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <button type="submit" id="btnLoginSubmit" class="w-full py-3 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md shadow-brand-500/20 transition flex items-center justify-center gap-2">
+          <i data-lucide="log-in" class="w-4 h-4"></i> Entrar
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- TOP HEADER -->
   <header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 px-4 py-3 sm:px-6">
     <div class="max-w-5xl mx-auto flex items-center justify-between">
@@ -73,7 +107,7 @@
         </div>
       </div>
 
-      <!-- Seletor de Mês/Ano & Dark Mode -->
+      <!-- Seletor de Mês/Ano & Dark Mode & Logout -->
       <div class="flex items-center gap-2">
         <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 text-xs sm:text-sm font-medium">
           <button id="btnPrevMonth" class="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-md transition" title="Mês anterior">
@@ -88,6 +122,10 @@
         <button id="btnToggleDark" class="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg bg-slate-100 dark:bg-slate-800 transition" title="Alternar tema">
           <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
           <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+        </button>
+
+        <button id="btnLogout" onclick="handleLogout()" class="p-2 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 rounded-lg bg-slate-100 dark:bg-slate-800 transition" title="Sair / Bloquear">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
         </button>
       </div>
     </div>
@@ -547,6 +585,14 @@
     // Inicialização
     document.addEventListener("DOMContentLoaded", async () => {
       initTheme();
+      const isAuth = await checkAuthentication();
+      if (isAuth) {
+        await initApp();
+      }
+      lucide.createIcons();
+    });
+
+    async function initApp() {
       initDatePickers();
       initDropzone();
       await loadCategories();
@@ -554,7 +600,76 @@
       await loadDashboardData();
       await loadTransactionsList();
       lucide.createIcons();
-    });
+    }
+
+    // ==========================================
+    // AUTENTICAÇÃO
+    // ==========================================
+    async function checkAuthentication() {
+      try {
+        const res = await fetch("/api/auth/me");
+        const data = await res.json();
+        const loginScreen = document.getElementById("loginScreen");
+        if (data.authenticated) {
+          loginScreen.classList.add("hidden");
+          return true;
+        } else {
+          loginScreen.classList.remove("hidden");
+          lucide.createIcons();
+          return false;
+        }
+      } catch (err) {
+        document.getElementById("loginScreen").classList.remove("hidden");
+        return false;
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const errBox = document.getElementById("loginErrorMsg");
+      const errText = document.getElementById("loginErrorText");
+      errBox.classList.add("hidden");
+
+      const u = document.getElementById("loginUsername").value.trim();
+      const p = document.getElementById("loginPassword").value;
+      const btn = document.getElementById("btnLoginSubmit");
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Entrando...`;
+      lucide.createIcons();
+
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errText.textContent = data.detail || "Usuário ou senha incorretos.";
+          errBox.classList.remove("hidden");
+          return;
+        }
+        document.getElementById("loginScreen").classList.add("hidden");
+        await initApp();
+      } catch (err) {
+        errText.textContent = "Erro ao conectar com o servidor: " + err.message;
+        errBox.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i> Entrar`;
+        lucide.createIcons();
+      }
+    }
+
+    async function handleLogout() {
+      if (!confirm("Deseja realmente sair?")) return;
+      try {
+        await fetch("/api/auth/logout", { method: "POST" });
+        location.reload();
+      } catch (err) {
+        location.reload();
+      }
+    }
 
     // Dark Mode
     function initTheme() {
