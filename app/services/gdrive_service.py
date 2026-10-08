@@ -66,6 +66,70 @@ def get_drive_credentials():
     return None
 
 
+def get_oauth_client_config() -> Optional[Dict[str, Any]]:
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if client_id and client_secret:
+        return {
+            "web": {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+            }
+        }
+    creds_file = Path("credentials.json")
+    if creds_file.exists():
+        try:
+            with open(creds_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+
+def get_oauth_authorization_url(redirect_uri: str) -> Optional[str]:
+    from google_auth_oauthlib.flow import Flow
+    client_config = get_oauth_client_config()
+    if not client_config:
+        return None
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=SCOPES,
+        redirect_uri=redirect_uri
+    )
+    auth_url, _ = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="select_account consent"
+    )
+    return auth_url
+
+
+def handle_oauth_callback(code: str, redirect_uri: str):
+    from google_auth_oauthlib.flow import Flow
+    client_config = get_oauth_client_config()
+    if not client_config:
+        raise ValueError("Configuração do cliente OAuth não encontrada.")
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=SCOPES,
+        redirect_uri=redirect_uri
+    )
+    flow.fetch_token(code=code)
+    creds = flow.credentials
+    with open(TOKEN_FILE, "w", encoding="utf-8") as f:
+        f.write(creds.to_json())
+    return creds
+
+
+def disconnect_gdrive():
+    if TOKEN_FILE.exists():
+        TOKEN_FILE.unlink()
+    return True
+
+
 def get_drive_service():
     creds = get_drive_credentials()
     if not creds:

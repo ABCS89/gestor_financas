@@ -43,7 +43,7 @@ app.include_router(receipts.router, dependencies=[Depends(require_auth)])
 app.include_router(transactions.router, dependencies=[Depends(require_auth)])
 app.include_router(bank_import.router, dependencies=[Depends(require_auth)])
 app.include_router(analytics.router, dependencies=[Depends(require_auth)])
-app.include_router(gdrive.router, dependencies=[Depends(require_auth)])
+app.include_router(gdrive.router)
 
 
 # Inicialização: alimentar categorias padrão
