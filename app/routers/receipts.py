@@ -1,4 +1,5 @@
 from typing import List, Optional
+from pathlib import Path
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -51,6 +52,7 @@ def list_receipts(db: Session = Depends(get_db)):
             "file_size": r.file_size,
             "uploaded_at": r.uploaded_at.isoformat(),
             "notes": r.notes,
+            "drive_web_url": r.drive_web_url,
             "url": f"/api/receipts/view/{r.filename}",
             "transaction": tx_info
         })
@@ -90,3 +92,38 @@ def delete_receipt(receipt_id: int, db: Session = Depends(get_db)):
     db.delete(receipt)
     db.commit()
     return {"message": "Comprovante excluído com sucesso"}
+
+
+@router.get("/ai-status")
+def get_ai_status():
+    import os
+    has_key = bool(os.getenv("GEMINI_API_KEY"))
+    if not has_key:
+        has_key = Path("gemini_key.txt").exists()
+    return {
+        "configured": has_key,
+        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
+    }
+
+
+@router.post("/{receipt_id}/analyze-ai")
+def analyze_single_receipt_ai(receipt_id: int, db: Session = Depends(get_db)):
+    from app.services.ai_agent import process_receipt_with_ai
+    try:
+        return process_receipt_with_ai(receipt_id, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro no processamento da IA: {str(e)}")
+
+
+@router.post("/analyze-all-ai")
+def analyze_all_receipts_ai(db: Session = Depends(get_db)):
+    from app.services.ai_agent import process_all_unlinked_receipts
+    try:
+        return process_all_unlinked_receipts(db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar comprovantes em lote com IA: {str(e)}")
+

@@ -204,17 +204,57 @@ def test_drive_connection() -> Dict[str, Any]:
 
 
 def list_files_in_folder(service, folder_id: str) -> List[Dict[str, Any]]:
-    # Buscar arquivos de imagens e PDFs na pasta
-    query = (
-        f"'{folder_id}' in parents and trashed = false and "
-        "(mimeType contains 'image/' or mimeType = 'application/pdf')"
-    )
-    results = service.files().list(
-        q=query,
-        pageSize=100,
-        fields="files(id, name, mimeType, size, webViewLink, createdTime)"
-    ).execute()
-    return results.get("files", [])
+    all_files = []
+    folders_to_scan = [folder_id]
+    visited_folders = set()
+
+    # Varre a pasta principal e todas as subpastas recursivamente
+    while folders_to_scan:
+        current_folder = folders_to_scan.pop(0)
+        if current_folder in visited_folders:
+            continue
+        visited_folders.add(current_folder)
+
+        # 1. Busca arquivos de imagens e PDFs nesta pasta
+        file_query = (
+            f"'{current_folder}' in parents and trashed = false and "
+            "(mimeType contains 'image/' or mimeType = 'application/pdf')"
+        )
+        page_token = None
+        while True:
+            try:
+                results = service.files().list(
+                    q=file_query,
+                    pageSize=100,
+                    fields="nextPageToken, files(id, name, mimeType, size, webViewLink, createdTime)",
+                    pageToken=page_token
+                ).execute()
+                all_files.extend(results.get("files", []))
+                page_token = results.get("nextPageToken")
+                if not page_token:
+                    break
+            except Exception as e:
+                print(f"Erro ao listar arquivos na pasta {current_folder}: {e}")
+                break
+
+        # 2. Busca subpastas dentro desta pasta para explorar
+        try:
+            folder_query = (
+                f"'{current_folder}' in parents and trashed = false and "
+                "mimeType = 'application/vnd.google-apps.folder'"
+            )
+            subfolders = service.files().list(
+                q=folder_query,
+                pageSize=100,
+                fields="files(id, name)"
+            ).execute()
+            for sub in subfolders.get("files", []):
+                if sub["id"] not in visited_folders:
+                    folders_to_scan.append(sub["id"])
+        except Exception as e:
+            print(f"Erro ao listar subpastas: {e}")
+
+    return all_files
 
 
 def sync_drive_receipts(folder_id: str, db: Session) -> Dict[str, Any]:

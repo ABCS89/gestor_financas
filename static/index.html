@@ -250,24 +250,38 @@
     </section>
 
     <!-- ========================================== -->
-    <!-- TAB 2: TRANSAÇÕES (LISTA COMPLETA & FILTROS) -->
+    <!-- TAB 2: TRANSAÇÕES (LISTA COMPLETA & EXTRATO EM TABELA) -->
     <!-- ========================================== -->
     <section id="tab-transactions" class="tab-content hidden space-y-4">
       <!-- Barra de Ferramentas / Filtros -->
-      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
         <!-- Campo de Busca -->
         <div class="relative flex-1">
           <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
-          <input type="text" id="txSearchInput" placeholder="Buscar por descrição..." class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <input type="text" id="txSearchInput" placeholder="Buscar por descrição, estabelecimento..." class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
 
-        <!-- Filtros Rápidos (Tipo) -->
-        <div class="flex items-center gap-2">
+        <!-- Filtros Rápidos (Tipo e Modo de Visualização) -->
+        <div class="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
           <select id="txTypeFilter" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm rounded-xl px-3 py-2 font-medium focus:ring-2 focus:ring-brand-500">
             <option value="">Todos os tipos</option>
             <option value="expense">Apenas Despesas</option>
             <option value="income">Apenas Receitas</option>
           </select>
+
+          <!-- Alternador Cards / Tabela -->
+          <div class="inline-flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/70 dark:border-slate-700">
+            <button id="btnViewCards" onclick="setTransactionViewMode('cards')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-white dark:bg-slate-900 shadow-sm text-slate-800 dark:text-slate-100" title="Visualização em Cards">
+              <i data-lucide="layout-list" class="w-3.5 h-3.5"></i> Cards
+            </button>
+            <button id="btnViewTable" onclick="setTransactionViewMode('table')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100" title="Visualização em Tabela (Extrato Detalhado)">
+              <i data-lucide="table" class="w-3.5 h-3.5"></i> Tabela
+            </button>
+          </div>
+
+          <button onclick="exportTransactionsCsv()" class="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs sm:text-sm font-semibold transition" title="Exportar Extrato em CSV">
+            <i data-lucide="download" class="w-4 h-4"></i>
+          </button>
 
           <button onclick="openTransactionModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition whitespace-nowrap">
             <i data-lucide="plus" class="w-4 h-4"></i> Nova
@@ -275,10 +289,39 @@
         </div>
       </div>
 
-      <!-- Lista de Transações -->
-      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+      <!-- Modo 1: Lista em Cards -->
+      <div id="txCardsContainer" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
         <div id="allTransactionsList" class="divide-y divide-slate-100 dark:divide-slate-800">
           <!-- Renderizado via JS -->
+        </div>
+      </div>
+
+      <!-- Modo 2: Tabela de Extrato Detalhada -->
+      <div id="txTableContainer" class="hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs sm:text-sm">
+            <thead class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
+              <tr>
+                <th class="py-3 px-4">Data</th>
+                <th class="py-3 px-4">Descrição / Estabelecimento</th>
+                <th class="py-3 px-4">Categoria</th>
+                <th class="py-3 px-4">Origem</th>
+                <th class="py-3 px-4 text-center">Comprovante</th>
+                <th class="py-3 px-4 text-right">Valor</th>
+                <th class="py-3 px-4 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="txTableBody" class="divide-y divide-slate-100 dark:divide-slate-800">
+              <!-- Renderizado via JS -->
+            </tbody>
+            <tfoot class="bg-slate-50/80 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 font-bold text-xs sm:text-sm">
+              <tr>
+                <td colspan="5" class="py-3 px-4 text-slate-600 dark:text-slate-300">Total do Período Filtrado:</td>
+                <td id="txTableTotal" class="py-3 px-4 text-right text-slate-900 dark:text-white">R$ 0,00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
     </section>
@@ -359,17 +402,27 @@
     <section id="tab-receipts" class="tab-content hidden space-y-6">
       <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 class="text-lg font-bold flex items-center gap-2">
-            <i data-lucide="receipt" class="w-5 h-5 text-indigo-500"></i> Comprovantes Anexados
-          </h2>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-lg font-bold flex items-center gap-2">
+              <i data-lucide="receipt" class="w-5 h-5 text-indigo-500"></i> Comprovantes Anexados
+            </h2>
+            <span id="geminiAiStatusBadge" class="text-[10px] px-2.5 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 flex items-center gap-1">
+              <i data-lucide="sparkles" class="w-3 h-3"></i> IA Gemini
+            </span>
+          </div>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Envie comprovantes de Pix, boletos pagos e faturas em PDF ou imagem.
+            Envie comprovantes de Pix, boletos pagos e faturas em PDF ou imagem. O Agente de IA lê, classifica e cruza os dados com o extrato.
           </p>
         </div>
 
-        <button onclick="openReceiptUploadModal()" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition">
-          <i data-lucide="upload" class="w-4 h-4"></i> Enviar Comprovante
-        </button>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="btnAnalyzeAllAi" onclick="analyzeAllReceiptsWithAi()" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm shadow-purple-500/20 transition active:scale-95" title="Processar todos os comprovantes pendentes com Inteligência Artificial">
+            <i data-lucide="sparkles" class="w-4 h-4"></i> Analisar Todos com IA
+          </button>
+          <button onclick="openReceiptUploadModal()" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition">
+            <i data-lucide="upload" class="w-4 h-4"></i> Enviar Comprovante
+          </button>
+        </div>
       </div>
 
       <!-- CARD DE INTEGRAÇÃO COM GOOGLE DRIVE -->
@@ -581,7 +634,9 @@
       currentYear: new Date().getFullYear(),
       categories: [],
       chartInstance: null,
-      previewImportData: null
+      previewImportData: null,
+      transactionsViewMode: "cards",
+      currentTransactions: []
     };
 
     const MONTH_NAMES = [
@@ -606,6 +661,7 @@
       updateMonthLabel();
       await loadDashboardData();
       await loadTransactionsList();
+      await loadAiStatus();
 
       if (window.location.search.includes("gdrive_success=1")) {
         switchTab("receipts");
@@ -730,6 +786,7 @@
       if (tabId === "receipts") {
         loadReceiptsList();
         loadGDriveStatus();
+        loadAiStatus();
       } else if (tabId === "transactions") {
         loadTransactionsList();
       } else if (tabId === "dashboard") {
@@ -936,6 +993,28 @@
       }
     }
 
+    // Alternar Modo de Visualização (Cards vs Tabela)
+    function setTransactionViewMode(mode) {
+      state.transactionsViewMode = mode;
+      const btnCards = document.getElementById("btnViewCards");
+      const btnTable = document.getElementById("btnViewTable");
+      const cardsContainer = document.getElementById("txCardsContainer");
+      const tableContainer = document.getElementById("txTableContainer");
+
+      if (mode === "cards") {
+        btnCards.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-white dark:bg-slate-900 shadow-sm text-slate-800 dark:text-slate-100";
+        btnTable.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100";
+        cardsContainer.classList.remove("hidden");
+        tableContainer.classList.add("hidden");
+      } else {
+        btnTable.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-white dark:bg-slate-900 shadow-sm text-slate-800 dark:text-slate-100";
+        btnCards.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100";
+        tableContainer.classList.remove("hidden");
+        cardsContainer.classList.add("hidden");
+      }
+      lucide.createIcons();
+    }
+
     // Carregar Lista Completa de Transações (Aba 2)
     async function loadTransactionsList() {
       try {
@@ -947,21 +1026,139 @@
 
         const res = await fetch(url);
         const txs = await res.json();
+        state.currentTransactions = txs || [];
+
         const container = document.getElementById("allTransactionsList");
 
         if (!txs || txs.length === 0) {
           container.innerHTML = '<div class="text-sm text-slate-400 py-12 text-center">Nenhuma transação encontrada com os filtros atuais.</div>';
-          return;
+        } else {
+          container.innerHTML = txs.map(tx => renderTransactionRow(tx, true)).join("");
         }
 
-        container.innerHTML = txs.map(tx => renderTransactionRow(tx, true)).join("");
+        // Renderizar também na tabela de extrato
+        renderTransactionTable(state.currentTransactions);
+
         lucide.createIcons();
       } catch (err) {
         console.error(err);
       }
     }
 
-    // HTML de uma linha de transação
+    // Renderizar Tabela de Extrato Detalhada
+    function renderTransactionTable(txs) {
+      const tbody = document.getElementById("txTableBody");
+      const tfootTotal = document.getElementById("txTableTotal");
+
+      if (!txs || txs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="py-10 text-center text-slate-400 text-xs sm:text-sm">
+              Nenhuma transação encontrada no período selecionado.
+            </td>
+          </tr>
+        `;
+        tfootTotal.textContent = "R$ 0,00";
+        tfootTotal.className = "py-3 px-4 text-right text-slate-400 font-bold";
+        return;
+      }
+
+      let totalNet = 0;
+
+      tbody.innerHTML = txs.map(tx => {
+        const isExpense = tx.type === "expense";
+        const val = isExpense ? -tx.amount : tx.amount;
+        totalNet += val;
+
+        const valClass = isExpense ? "text-rose-600 dark:text-rose-400 font-bold" : "text-emerald-600 dark:text-emerald-400 font-bold";
+        const valFormatted = (isExpense ? "- " : "+ ") + formatMoney(tx.amount);
+        const catColor = tx.category ? tx.category.color : "#94a3b8";
+        const catName = tx.category ? tx.category.name : "Geral";
+
+        let originBadge = '<span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium">Manual</span>';
+        if (tx.source === "ia_comprovante") {
+          originBadge = '<span class="text-[10px] px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-medium inline-flex items-center gap-1"><i data-lucide="sparkles" class="w-2.5 h-2.5"></i> Boleto / IA</span>';
+        } else if (tx.source === "ofx" || tx.source === "csv") {
+          originBadge = `<span class="text-[10px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-medium">${tx.source.toUpperCase()} Extrato</span>`;
+        }
+
+        let receiptBtn = '<span class="text-slate-300 dark:text-slate-600 text-xs">-</span>';
+        if (tx.receipt) {
+          receiptBtn = `
+            <button onclick="viewReceipt('${tx.receipt.filename}', '${escapeHtml(tx.description)}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition text-[11px] font-semibold" title="Visualizar comprovante original">
+              <i data-lucide="paperclip" class="w-3.5 h-3.5"></i> Ver
+            </button>
+          `;
+        }
+
+        return `
+          <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+            <td class="py-3 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs font-mono">
+              ${formatDate(tx.date)}
+            </td>
+            <td class="py-3 px-4 font-medium text-slate-800 dark:text-slate-100">
+              <div class="truncate max-w-[260px] text-xs sm:text-sm" title="${escapeHtml(tx.description)}">
+                ${escapeHtml(tx.description)}
+              </div>
+              ${tx.notes ? `<div class="text-[10px] text-slate-400 truncate max-w-[260px] mt-0.5">${escapeHtml(tx.notes)}</div>` : ''}
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-md" style="background-color: ${catColor}15; color: ${catColor}">
+                <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${catColor}"></span>
+                ${escapeHtml(catName)}
+              </span>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              ${originBadge}
+            </td>
+            <td class="py-3 px-4 text-center whitespace-nowrap">
+              ${receiptBtn}
+            </td>
+            <td class="py-3 px-4 text-right whitespace-nowrap ${valClass} text-xs sm:text-sm">
+              ${valFormatted}
+            </td>
+            <td class="py-3 px-4 text-center whitespace-nowrap">
+              <button onclick="deleteTransaction(${tx.id})" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition" title="Excluir">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      tfootTotal.textContent = (totalNet >= 0 ? "+ " : "- ") + formatMoney(Math.abs(totalNet));
+      tfootTotal.className = `py-3 px-4 text-right font-bold text-xs sm:text-sm ${totalNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`;
+    }
+
+    // Exportar Transações Filtradas para CSV
+    function exportTransactionsCsv() {
+      if (!state.currentTransactions || state.currentTransactions.length === 0) {
+        alert("Nenhuma transação para exportar neste período ou filtro.");
+        return;
+      }
+
+      let csv = "Data;Descrição;Categoria;Tipo;Origem;Valor (R$)\n";
+      state.currentTransactions.forEach(tx => {
+        const d = formatDate(tx.date);
+        const desc = `"${(tx.description || '').replace(/"/g, '""')}"`;
+        const cat = `"${(tx.category ? tx.category.name : 'Geral').replace(/"/g, '""')}"`;
+        const t = tx.type === "expense" ? "Despesa" : "Receita";
+        const orig = tx.source || "manual";
+        const val = tx.amount.toFixed(2).replace(".", ",");
+        csv += `${d};${desc};${cat};${t};${orig};${val}\n`;
+      });
+
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `extrato_financas_${state.currentYear}_${state.currentMonth}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // HTML de uma linha de transação (Modo Cards)
     function renderTransactionRow(tx, showDelete = false) {
       const isExpense = tx.type === "expense";
       const amountPrefix = isExpense ? "- " : "+ ";
@@ -973,9 +1170,18 @@
       let receiptBadge = "";
       if (tx.receipt) {
         receiptBadge = `
-          <button onclick="viewReceipt('${tx.receipt.filename}', '${tx.description}')" class="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 text-[11px] font-semibold flex items-center gap-1 hover:bg-indigo-100 transition" title="Ver comprovante anexado">
+          <button onclick="viewReceipt('${tx.receipt.filename}', '${escapeHtml(tx.description)}')" class="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 text-[11px] font-semibold flex items-center gap-1 hover:bg-indigo-100 transition" title="Ver comprovante anexado">
             <i data-lucide="paperclip" class="w-3 h-3"></i> Comprovante
           </button>
+        `;
+      }
+
+      let sourceBadge = "";
+      if (tx.source === "ia_comprovante") {
+        sourceBadge = `
+          <span class="px-2 py-0.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 text-[10px] font-semibold flex items-center gap-1" title="Lançado ou cruzado automaticamente pelo Agente de IA">
+            <i data-lucide="sparkles" class="w-2.5 h-2.5"></i> IA
+          </span>
         `;
       }
 
@@ -1003,6 +1209,7 @@
                   <span class="w-2 h-2 rounded-full" style="background-color: ${catColor}"></span>
                   ${catName}
                 </span>
+                ${sourceBadge}
                 ${receiptBadge}
               </div>
             </div>
@@ -1247,6 +1454,102 @@
     // ==========================================
     // COMPROVANTES
     // ==========================================
+    // ==========================================
+    // AGENTE DE IA (GEMINI) E COMPROVANTES
+    // ==========================================
+    async function loadAiStatus() {
+      try {
+        const res = await fetch("/api/receipts/ai-status");
+        const data = await res.json();
+        const badge = document.getElementById("geminiAiStatusBadge");
+        if (!badge) return;
+
+        if (data.configured) {
+          badge.className = "text-[10px] px-2.5 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 flex items-center gap-1";
+          badge.innerHTML = `<i data-lucide="sparkles" class="w-3 h-3 text-purple-600 dark:text-purple-400"></i> IA Gemini Ativa (${data.model})`;
+        } else {
+          badge.className = "text-[10px] px-2.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 flex items-center gap-1";
+          badge.innerHTML = `<i data-lucide="alert-circle" class="w-3 h-3 text-amber-600"></i> IA: Chave Pendente`;
+        }
+        lucide.createIcons();
+      } catch (err) {
+        console.error("Erro ao verificar status da IA:", err);
+      }
+    }
+
+    async function analyzeSingleReceiptAi(receiptId, btnElement) {
+      const originalHtml = btnElement ? btnElement.innerHTML : "";
+      if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.innerHTML = `<i data-lucide="loader" class="w-3 h-3 animate-spin"></i> Analisando...`;
+        lucide.createIcons();
+      }
+
+      try {
+        const res = await fetch(`/api/receipts/${receiptId}/analyze-ai`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) {
+          alert("Aviso do Agente de IA: " + (data.detail || "Erro no processamento"));
+          return;
+        }
+
+        alert(`🤖 Análise Concluída com Sucesso!\n\n${data.action}\n\n• Documento: ${data.details.tipo_documento}\n• Favorecido: ${data.details.estabelecimento}\n• Valor: R$ ${data.details.valor.toFixed(2)}\n• Categoria: ${data.details.categoria_sugerida}`);
+        await loadReceiptsList();
+        await loadDashboardData();
+        await loadTransactionsList();
+      } catch (err) {
+        alert("Erro ao comunicar com a IA: " + err.message);
+      } finally {
+        if (btnElement) {
+          btnElement.disabled = false;
+          btnElement.innerHTML = originalHtml;
+          lucide.createIcons();
+        }
+      }
+    }
+
+    async function analyzeAllReceiptsWithAi() {
+      const btn = document.getElementById("btnAnalyzeAllAi");
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Processando com IA...`;
+      lucide.createIcons();
+
+      try {
+        const res = await fetch("/api/receipts/analyze-all-ai", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) {
+          alert("Aviso do Agente de IA: " + (data.detail || "Erro no processamento em lote"));
+          return;
+        }
+
+        if (data.total_processed === 0) {
+          alert("Todos os comprovantes existentes já estão vinculados a transações no extrato!");
+          return;
+        }
+
+        let msg = `🤖 Processamento Concluído!\n\nTotal de comprovantes analisados: ${data.total_processed}\nSucessos: ${data.success_count}\nFalhas: ${data.error_count}\n\n`;
+        if (data.items && data.items.length > 0) {
+          data.items.slice(0, 5).forEach(item => {
+            msg += `• ${item.filename}: ${item.action || item.error}\n`;
+          });
+          if (data.items.length > 5) {
+            msg += `... e mais ${data.items.length - 5} arquivos.`;
+          }
+        }
+        alert(msg);
+
+        await loadReceiptsList();
+        await loadDashboardData();
+        await loadTransactionsList();
+      } catch (err) {
+        alert("Erro ao executar análise em lote com IA: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> Analisar Todos com IA`;
+        lucide.createIcons();
+      }
+    }
+
     async function loadReceiptsList() {
       try {
         const res = await fetch("/api/receipts");
@@ -1254,7 +1557,7 @@
         const grid = document.getElementById("receiptsGrid");
 
         if (!receipts || receipts.length === 0) {
-          grid.innerHTML = '<div class="col-span-full text-center py-12 text-sm text-slate-400">Nenhum comprovante enviado ainda.</div>';
+          grid.innerHTML = '<div class="col-span-full text-center py-12 text-sm text-slate-400">Nenhum comprovante enviado ainda. Baixe do Google Drive ou envie acima.</div>';
           return;
         }
 
@@ -1264,40 +1567,71 @@
             ? `<div class="w-full h-36 bg-rose-50 dark:bg-rose-950/30 flex flex-col items-center justify-center text-rose-500"><i data-lucide="file-text" class="w-10 h-10 mb-1"></i><span class="text-xs font-semibold">Documento PDF</span></div>`
             : `<img src="${r.url}" alt="${escapeHtml(r.original_filename)}" class="w-full h-36 object-cover bg-slate-100 dark:bg-slate-800">`;
 
-          let linkedTx = '<span class="text-[11px] text-amber-500">Sem transação vinculada</span>';
+          let linkedTx = '';
+          let aiActionBtn = '';
+
           if (r.transaction) {
-            linkedTx = `<span class="text-[11px] text-emerald-600 font-semibold truncate block">Vinculado: ${escapeHtml(r.transaction.description)} (${formatMoney(r.transaction.amount)})</span>`;
+            linkedTx = `
+              <div class="mt-2 p-2 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40">
+                <div class="flex items-center justify-between text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider mb-0.5">
+                  <span class="flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Vinculado ao Extrato</span>
+                  <span>${formatDate(r.transaction.date)}</span>
+                </div>
+                <div class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">${escapeHtml(r.transaction.description)}</div>
+                <div class="text-xs font-semibold text-rose-600 dark:text-rose-400 mt-0.5">${formatMoney(r.transaction.amount)}</div>
+              </div>
+            `;
+          } else {
+            linkedTx = `
+              <div class="mt-2 flex items-center justify-between gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Pendente de análise</span>
+              </div>
+            `;
+            aiActionBtn = `
+              <button onclick="analyzeSingleReceiptAi(${r.id}, this)" class="px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm shadow-purple-500/20 transition active:scale-95" title="Analisar boleto ou comprovante com IA">
+                <i data-lucide="sparkles" class="w-3 h-3"></i> Analisar com IA
+              </button>
+            `;
           }
 
           let driveBadge = "";
           if (r.drive_web_url) {
             driveBadge = `
               <a href="${r.drive_web_url}" target="_blank" class="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full font-semibold hover:underline" title="Abrir no Google Drive">
-                <i data-lucide="external-link" class="w-3 h-3"></i> Google Drive
+                <i data-lucide="external-link" class="w-3 h-3"></i> Drive
               </a>
             `;
           }
 
+          let notesDisplay = "";
+          if (r.notes) {
+            notesDisplay = `<div class="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-1.5 bg-slate-50 dark:bg-slate-800/60 px-2 py-1 rounded-lg" title="${escapeHtml(r.notes)}">${escapeHtml(r.notes)}</div>`;
+          }
+
           return `
-            <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
-              <div class="cursor-pointer" onclick="viewReceipt('${r.filename}', '${escapeHtml(r.original_filename)}')">
-                ${previewHtml}
-              </div>
-              <div class="p-3 flex-1 flex flex-col justify-between">
-                <div>
+            <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col justify-between">
+              <div>
+                <div class="cursor-pointer" onclick="viewReceipt('${r.filename}', '${escapeHtml(r.original_filename)}')">
+                  ${previewHtml}
+                </div>
+                <div class="p-3">
                   <div class="flex items-center justify-between gap-2">
                     <span class="font-semibold text-xs truncate text-slate-800 dark:text-slate-100" title="${r.original_filename}">
                       ${escapeHtml(r.original_filename)}
                     </span>
                     ${driveBadge}
                   </div>
-                  <div class="mt-1">${linkedTx}</div>
+                  ${linkedTx}
+                  ${notesDisplay}
                 </div>
-                <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+              </div>
+              <div class="p-3 pt-0">
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
                   <span class="text-[10px] text-slate-400">${(r.file_size / 1024).toFixed(0)} KB</span>
                   <div class="flex items-center gap-1">
-                    <button onclick="viewReceipt('${r.filename}', '${escapeHtml(r.original_filename)}')" class="p-1 rounded-lg text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-xs font-semibold flex items-center gap-1">
-                      <i data-lucide="eye" class="w-3.5 h-3.5"></i> Ver
+                    ${aiActionBtn}
+                    <button onclick="viewReceipt('${r.filename}', '${escapeHtml(r.original_filename)}')" class="p-1 rounded-lg text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-xs font-semibold flex items-center gap-1" title="Ver documento">
+                      <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                     </button>
                     <button onclick="deleteReceipt(${r.id})" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 transition" title="Excluir comprovante">
                       <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
