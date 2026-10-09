@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 from app.models import Receipt, Transaction, Category
 from app.services.receipt_service import get_receipt_filepath
 
-# Modelos padrão do Gemini (suporta Pro ou Flash)
-DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
+# Modelos padrão do Gemini (suporta Flash ou Pro)
+DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 
 class ReceiptAnalysisResult(BaseModel):

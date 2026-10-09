@@ -102,7 +102,7 @@ def get_ai_status():
         has_key = Path("gemini_key.txt").exists()
     return {
         "configured": has_key,
-        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
+        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     }
 
 
