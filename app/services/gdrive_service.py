@@ -3,7 +3,7 @@ import io
 import json
 import uuid
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from google.oauth2 import service_account
@@ -89,38 +89,73 @@ def get_oauth_client_config() -> Optional[Dict[str, Any]]:
     return None
 
 
-def get_oauth_authorization_url(redirect_uri: str) -> Optional[str]:
+VERIFIER_TEMP_FILE = Path(".oauth_verifier.tmp")
+
+
+def get_oauth_authorization_url(redirect_uri: str) -> Tuple[Optional[str], Optional[str]]:
     from google_auth_oauthlib.flow import Flow
     client_config = get_oauth_client_config()
     if not client_config:
-        return None
+        return None, None
     flow = Flow.from_client_config(
         client_config,
         scopes=SCOPES,
         redirect_uri=redirect_uri
     )
+    code_verifier = getattr(flow, "code_verifier", None)
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
-        prompt="select_account consent"
+        prompt="select_account consent",
+        state=code_verifier or ""
     )
-    return auth_url
+    # Salva temporariamente como garantia extra
+    if code_verifier:
+        try:
+            with open(VERIFIER_TEMP_FILE, "w", encoding="utf-8") as f:
+                f.write(code_verifier)
+        except Exception:
+            pass
+
+    return auth_url, code_verifier
 
 
-def handle_oauth_callback(code: str, redirect_uri: str):
+def handle_oauth_callback(code: str, redirect_uri: str, code_verifier: Optional[str] = None):
     from google_auth_oauthlib.flow import Flow
     client_config = get_oauth_client_config()
     if not client_config:
         raise ValueError("Configuração do cliente OAuth não encontrada.")
+
+    # Se não veio via parâmetro, tenta ler do arquivo temporário
+    if not code_verifier and VERIFIER_TEMP_FILE.exists():
+        try:
+            with open(VERIFIER_TEMP_FILE, "r", encoding="utf-8") as f:
+                code_verifier = f.read().strip()
+        except Exception:
+            pass
+
     flow = Flow.from_client_config(
         client_config,
         scopes=SCOPES,
         redirect_uri=redirect_uri
     )
-    flow.fetch_token(code=code)
+    if code_verifier:
+        flow.code_verifier = code_verifier
+        flow.fetch_token(code=code, code_verifier=code_verifier)
+    else:
+        flow.fetch_token(code=code)
+
     creds = flow.credentials
     with open(TOKEN_FILE, "w", encoding="utf-8") as f:
         f.write(creds.to_json())
+
+    # Limpa arquivo temporário
+    if VERIFIER_TEMP_FILE.exists():
+        try:
+            VERIFIER_TEMP_FILE.unlink()
+        except Exception:
+            pass
+
     return creds
 
 

@@ -1,5 +1,6 @@
 import os
 import json
+from typing import Optional
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -78,17 +79,22 @@ def get_auth_url(request: Request, user: str = Depends(require_auth)):
             base_url = f"{forwarded_proto}://{request.url.netloc}"
         redirect_uri = f"{base_url}/api/gdrive/auth/callback"
 
-    auth_url = get_oauth_authorization_url(redirect_uri)
+    auth_url, code_verifier = get_oauth_authorization_url(redirect_uri)
     if not auth_url:
         raise HTTPException(
             status_code=400,
             detail="Credenciais do Google OAuth não configuradas. Adicione GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET."
         )
-    return {"auth_url": auth_url, "redirect_uri": redirect_uri}
+
+    from fastapi.responses import JSONResponse
+    resp = JSONResponse({"auth_url": auth_url, "redirect_uri": redirect_uri})
+    if code_verifier:
+        resp.set_cookie(key="oauth_verifier", value=code_verifier, max_age=600, httponly=True, samesite="lax")
+    return resp
 
 
 @router.get("/auth/callback")
-def oauth_callback(code: str, request: Request):
+def oauth_callback(code: str, request: Request, state: Optional[str] = None):
     redirect_uri = os.getenv("GDRIVE_REDIRECT_URI")
     if not redirect_uri:
         base_url = str(request.base_url).rstrip("/")
@@ -97,7 +103,8 @@ def oauth_callback(code: str, request: Request):
             base_url = f"{forwarded_proto}://{request.url.netloc}"
         redirect_uri = f"{base_url}/api/gdrive/auth/callback"
     try:
-        handle_oauth_callback(code, redirect_uri)
+        code_verifier = state or request.cookies.get("oauth_verifier")
+        handle_oauth_callback(code, redirect_uri, code_verifier=code_verifier)
         return RedirectResponse(url="/?gdrive_success=1")
     except Exception as e:
         return RedirectResponse(url=f"/?gdrive_error={str(e)}")
