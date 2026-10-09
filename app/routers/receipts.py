@@ -97,11 +97,18 @@ def delete_receipt(receipt_id: int, db: Session = Depends(get_db)):
 @router.get("/ai-status")
 def get_ai_status():
     import os
-    has_key = bool(os.getenv("GEMINI_API_KEY"))
-    if not has_key:
-        has_key = Path("gemini_key.txt").exists()
+    from app.services.ai_agent import get_clean_api_key
+    api_key = get_clean_api_key()
+    masked = ""
+    if api_key:
+        if len(api_key) > 8:
+            masked = api_key[:4] + "..." + api_key[-4:]
+        else:
+            masked = api_key[:2] + "..."
     return {
-        "configured": has_key,
+        "configured": bool(api_key),
+        "key_preview": masked,
+        "key_length": len(api_key) if api_key else 0,
         "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     }
 
