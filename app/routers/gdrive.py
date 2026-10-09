@@ -70,14 +70,14 @@ def save_oauth_credentials(payload: OAuthCredentialsPayload, user: str = Depends
 
 @router.get("/auth/url")
 def get_auth_url(request: Request, user: str = Depends(require_auth)):
-    # Constrói o redirect_uri baseado no host da requisição (ex: https://gestor-financas-okp0.onrender.com)
-    base_url = str(request.base_url).rstrip("/")
-    # Garante https se estiver rodando em proxy/Render
-    forwarded_proto = request.headers.get("x-forwarded-proto")
-    if forwarded_proto:
-        base_url = f"{forwarded_proto}://{request.url.netloc}"
+    redirect_uri = os.getenv("GDRIVE_REDIRECT_URI")
+    if not redirect_uri:
+        base_url = str(request.base_url).rstrip("/")
+        forwarded_proto = request.headers.get("x-forwarded-proto")
+        if forwarded_proto:
+            base_url = f"{forwarded_proto}://{request.url.netloc}"
+        redirect_uri = f"{base_url}/api/gdrive/auth/callback"
 
-    redirect_uri = f"{base_url}/api/gdrive/auth/callback"
     auth_url = get_oauth_authorization_url(redirect_uri)
     if not auth_url:
         raise HTTPException(
@@ -89,12 +89,13 @@ def get_auth_url(request: Request, user: str = Depends(require_auth)):
 
 @router.get("/auth/callback")
 def oauth_callback(code: str, request: Request):
-    base_url = str(request.base_url).rstrip("/")
-    forwarded_proto = request.headers.get("x-forwarded-proto")
-    if forwarded_proto:
-        base_url = f"{forwarded_proto}://{request.url.netloc}"
-
-    redirect_uri = f"{base_url}/api/gdrive/auth/callback"
+    redirect_uri = os.getenv("GDRIVE_REDIRECT_URI")
+    if not redirect_uri:
+        base_url = str(request.base_url).rstrip("/")
+        forwarded_proto = request.headers.get("x-forwarded-proto")
+        if forwarded_proto:
+            base_url = f"{forwarded_proto}://{request.url.netloc}"
+        redirect_uri = f"{base_url}/api/gdrive/auth/callback"
     try:
         handle_oauth_callback(code, redirect_uri)
         return RedirectResponse(url="/?gdrive_success=1")
