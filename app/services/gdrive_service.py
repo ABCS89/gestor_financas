@@ -93,7 +93,10 @@ VERIFIER_TEMP_FILE = Path(".oauth_verifier.tmp")
 
 
 def get_oauth_authorization_url(redirect_uri: str) -> Tuple[Optional[str], Optional[str]]:
+    from string import ascii_letters, digits
+    from random import SystemRandom
     from google_auth_oauthlib.flow import Flow
+
     client_config = get_oauth_client_config()
     if not client_config:
         return None, None
@@ -102,20 +105,24 @@ def get_oauth_authorization_url(redirect_uri: str) -> Tuple[Optional[str], Optio
         scopes=SCOPES,
         redirect_uri=redirect_uri
     )
-    code_verifier = getattr(flow, "code_verifier", None)
+    # Gera explicitamente o code_verifier ANTES para o Flow usar no hash e passar no state
+    chars = ascii_letters + digits + "-._~"
+    rnd = SystemRandom()
+    code_verifier = "".join([rnd.choice(chars) for _ in range(0, 128)])
+    flow.code_verifier = code_verifier
+
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="select_account consent",
-        state=code_verifier or ""
+        state=code_verifier
     )
-    # Salva temporariamente como garantia extra
-    if code_verifier:
-        try:
-            with open(VERIFIER_TEMP_FILE, "w", encoding="utf-8") as f:
-                f.write(code_verifier)
-        except Exception:
-            pass
+
+    try:
+        with open(VERIFIER_TEMP_FILE, "w", encoding="utf-8") as f:
+            f.write(code_verifier)
+    except Exception:
+        pass
 
     return auth_url, code_verifier
 
