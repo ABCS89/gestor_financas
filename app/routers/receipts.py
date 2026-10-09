@@ -109,7 +109,7 @@ def get_ai_status():
         "configured": bool(api_key),
         "key_preview": masked,
         "key_length": len(api_key) if api_key else 0,
-        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        "model": os.getenv("GEMINI_MODEL", "gemini-flash-latest")
     }
 
 

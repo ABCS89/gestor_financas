@@ -10,7 +10,7 @@ from app.models import Receipt, Transaction, Category
 from app.services.receipt_service import get_receipt_filepath
 
 # Modelos padrão do Gemini (suporta Flash ou Pro)
-DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
 
 class ReceiptAnalysisResult(BaseModel):
@@ -176,7 +176,7 @@ def analyze_receipt_document(receipt: Receipt, categories: List[Category]) -> Re
     Seja estritamente preciso nos valores e datas.
     """
 
-    models_to_try = [DEFAULT_GEMINI_MODEL, "gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    models_to_try = [DEFAULT_GEMINI_MODEL, "gemini-flash-latest", "gemini-pro-latest", "gemini-flash-lite-latest"]
     last_err = None
 
     # Método 1: Tentar via SDK oficial google-genai
