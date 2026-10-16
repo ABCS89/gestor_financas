@@ -4,9 +4,13 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./financas.db")
 
-# Render e Heroku costumam fornecer postgres://, enquanto o SQLAlchemy 2.0 exige postgresql://
+# Render e Heroku costumam fornecer postgres:// ou postgresql://.
+# No SQLAlchemy 2.0, se usar apenas postgresql:// ele busca 'psycopg' (v3). 
+# Com postgresql+psycopg2:// ele usa o driver psycopg2 instalado com segurança.
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 engine = create_engine(
     DATABASE_URL,
